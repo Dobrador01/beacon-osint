@@ -1,3 +1,5 @@
+"use node";
+
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { GoogleGenAI, Type, Schema } from "@google/genai";
