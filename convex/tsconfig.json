@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+      "target": "ESNext",
+      "module": "ESNext",
+      "lib": ["ES2021", "DOM"],
+      "forceConsistentCasingInFileNames": true,
+      "strict": true,
+      "skipLibCheck": true,
+      "moduleResolution": "Bundler",
+      "isolatedModules": true,
+      "resolveJsonModule": true
+    },
+    "include": ["./**/*"],
+    "exclude": ["./_generated"]
+  }
