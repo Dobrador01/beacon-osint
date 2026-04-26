@@ -23,7 +23,9 @@ export const upsertAlerta = internalMutation({
         await ctx.db.patch(existing._id, { ...args });
         console.log(`[UPSERT] Alerta evoluiu e foi atualizado no DB: ${args.guid}`);
       } else {
-        console.log(`[HASH-DROP] Alerta ignorado, nenhuma mutação de conteúdo: ${args.guid}`);
+        // Renovar janela de expiração para manter alerta vivo enquanto a Defesa Civil continuar publicando
+        await ctx.db.patch(existing._id, { expiresAt: args.expiresAt });
+        console.log(`[TTL-REFRESH] Janela de expiração renovada para: ${args.guid}`);
       }
     } else {
       await ctx.db.insert("alertas_rss", args);
