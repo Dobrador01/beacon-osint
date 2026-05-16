@@ -16,6 +16,27 @@ export const fetchWeatherOSINT = action({
   args: {},
   handler: async (ctx: any) => {
     console.log("[INGESTOR] === Ciclo de ingestão iniciado ===");
+    const cicloIniciadoEm = Date.now();
+    // Helper pra heartbeat de health (singleton osint_health). Chamado em
+    // todos os caminhos de saída — sucesso ou erro — pra UI saber que o
+    // ciclo rodou e quando foi a última vez.
+    const recordHealth = async (
+      processados: number,
+      falhados: number,
+      lastError: string | null,
+    ) => {
+      try {
+        await ctx.runMutation(internal.mutations.recordOsintHealth, {
+          lastRunAt: Date.now(),
+          lastSuccessAt: lastError === null ? Date.now() : null,
+          lastError,
+          itemsProcessed: processados,
+          itemsFailed: falhados,
+        });
+      } catch (e: any) {
+        console.error("[INGESTOR] Falha ao gravar osint_health:", e?.message);
+      }
+    };
 
     const parser = new Parser();
     let feed;
@@ -24,14 +45,19 @@ export const fetchWeatherOSINT = action({
       console.log(`[INGESTOR] RSS: ${feed.items?.length || 0} itens`);
     } catch (e: any) {
       console.error("[INGESTOR] FALHA RSS:", e.message);
+      await recordHealth(0, 0, `RSS fetch failed: ${e.message}`);
       return;
     }
 
-    if (!feed.items || feed.items.length === 0) return;
+    if (!feed.items || feed.items.length === 0) {
+      await recordHealth(0, 0, null);
+      return;
+    }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.error("[INGESTOR] GEMINI_API_KEY ausente!");
+      await recordHealth(0, 0, "GEMINI_API_KEY ausente no env");
       return;
     }
 
@@ -75,6 +101,8 @@ Retorne SEMPRE os valores numéricos do dicionário.
 
     let processados = 0;
     let pulados = 0;
+    let falhados = 0;
+    let ultimoErro: string | null = null;
 
     for (const item of feed.items) {
       const descricao = item.contentSnippet || item.content || item.description || "";
@@ -144,9 +172,13 @@ Retorne SEMPRE os valores numéricos do dicionário.
         processados++;
       } catch(e: any) {
         console.error(`[INGESTOR] ERRO: ${e.message?.substring(0, 100)}`);
+        falhados++;
+        ultimoErro = (e?.message ?? String(e)).substring(0, 200);
       }
     }
 
-    console.log(`[INGESTOR] Fim: ${processados} novos, ${pulados} renovados (sem API)`);
+    console.log(`[INGESTOR] Fim: ${processados} novos, ${pulados} renovados (sem API), ${falhados} falhados`);
+    await recordHealth(processados, falhados, ultimoErro);
+    void cicloIniciadoEm; // anti-warn (poderia logar duração, deixei como hook futuro)
   }
 });

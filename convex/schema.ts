@@ -106,6 +106,20 @@ export default defineSchema({
   })
     .index("by_singleton", ["singleton"]),
 
+  // ── OSINT Health — Heartbeat do ingestor da Defesa Civil (singleton) ──
+  // Atualizado por convex/ingestor.ts:fetchWeatherOSINT ao fim de cada ciclo.
+  // Consumido pelo BeaconStatusWidget pra mostrar "última verificação há X min"
+  // e flag DESATUALIZADO quando lastRunAt > 20 min.
+  osint_health: defineTable({
+    singleton: v.literal("global"),
+    lastRunAt: v.number(),
+    lastSuccessAt: v.union(v.number(), v.null()),
+    lastError: v.union(v.string(), v.null()),
+    itemsProcessed: v.number(),
+    itemsFailed: v.number(),
+  })
+    .index("by_singleton", ["singleton"]),
+
   // ── DEFCON — Estado Operacional Agregado (singleton) ───────────────────
   // Convenção militar: 1 = mais crítico, 5 = tranquilo. O nível global é
   // calculado por regras determinísticas em convex/defcon/rules.ts; o Gemini

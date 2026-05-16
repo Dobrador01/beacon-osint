@@ -28,6 +28,31 @@ export const buscarPorGuid = internalQuery({
   },
 });
 
+/**
+ * Health do ingestor da Defesa Civil (singleton). Subscrita pelo
+ * BeaconStatusWidget pra mostrar "última verificação há X min" e flag
+ * DESATUALIZADO quando passa do threshold (20 min no frontend).
+ *
+ * Retorna null se o ingestor ainda não rodou neste deploy.
+ */
+export const getOsintHealth = query({
+  args: {},
+  handler: async (ctx) => {
+    const row = await ctx.db
+      .query("osint_health")
+      .withIndex("by_singleton", (q) => q.eq("singleton", "global"))
+      .unique();
+    if (!row) return null;
+    return {
+      lastRunAt: row.lastRunAt,
+      lastSuccessAt: row.lastSuccessAt,
+      lastError: row.lastError,
+      itemsProcessed: row.itemsProcessed,
+      itemsFailed: row.itemsFailed,
+    };
+  },
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Grid 48 Gateway
 // ═══════════════════════════════════════════════════════════════════════════

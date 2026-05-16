@@ -69,6 +69,32 @@ export const refreshTTL = internalMutation({
   }
 });
 
+/**
+ * Heartbeat do ingestor — chamada do fetchWeatherOSINT ao fim de cada ciclo
+ * (sucesso ou erro). Upsert no singleton osint_health pra UI mostrar
+ * "última verificação há X min" / flag DESATUALIZADO.
+ */
+export const recordOsintHealth = internalMutation({
+  args: {
+    lastRunAt: v.number(),
+    lastSuccessAt: v.union(v.number(), v.null()),
+    lastError: v.union(v.string(), v.null()),
+    itemsProcessed: v.number(),
+    itemsFailed: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("osint_health")
+      .withIndex("by_singleton", (q) => q.eq("singleton", "global"))
+      .unique();
+    if (existing) {
+      await ctx.db.patch(existing._id, args);
+    } else {
+      await ctx.db.insert("osint_health", { singleton: "global", ...args });
+    }
+  },
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Grid 48 Gateway — telemetria LoRa + SITREP queue
 // ═══════════════════════════════════════════════════════════════════════════
