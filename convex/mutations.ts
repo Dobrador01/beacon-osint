@@ -1,4 +1,5 @@
 import { internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -35,6 +36,9 @@ export const upsertAlerta = internalMutation({
       await ctx.db.insert("alertas_rss", args);
       console.log(`[INSERCAO] Nova ameaça estruturada via RSS registrada no Grid: ${args.guid}`);
     }
+    // Reativo: alerta novo/atualizado/renovado pode mudar o estado DEFCON.
+    // runAfter(0) desacopla — falha no recompute não derruba a ingestão.
+    await ctx.scheduler.runAfter(0, internal.defcon.mutations.recomputeDefcon, {});
   },
 });
 
@@ -95,7 +99,10 @@ export const ingestTelemetry = internalMutation({
     }
 
     console.log(`[INGEST] New telemetry packet: ${args.node_id}_${args.packet_id}`);
-    return await ctx.db.insert("telemetry", args);
+    const id = await ctx.db.insert("telemetry", args);
+    // Reativo: novo pacote LoRa pode mudar nodes_online_5min e disparar regras.
+    await ctx.scheduler.runAfter(0, internal.defcon.mutations.recomputeDefcon, {});
+    return id;
   },
 });
 
@@ -145,6 +152,8 @@ export const completeSitrep = internalMutation({
         ttl_seconds: args.ttl_seconds,
       });
       console.log(`[SITREP] Completed request: ${args.request_id}`);
+      // Reativo: novo sitrep "ready" muda o latest_valor da categoria.
+      await ctx.scheduler.runAfter(0, internal.defcon.mutations.recomputeDefcon, {});
     }
   },
 });

@@ -28,4 +28,13 @@ crons.interval(
   internal.mutations.gcSitrepQueue,
 );
 
+// ── Celesc — Retention 90d do histórico ────────────────────────────────
+// Roda diariamente. A mutation processa em batches de 200 e auto-agenda
+// continuação se atingir o limite (caso de pico/backlog).
+crons.interval(
+  "gc-celesc-history",
+  { hours: 24 },
+  internal.celesc.mutations.gcCelescHistory,
+);
+
 export default crons;
