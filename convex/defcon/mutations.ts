@@ -150,11 +150,60 @@ async function buildAggregatedSignals(
 }
 
 /**
+ * Coleta contexto extra (alertas top + breakdown Celesc completo) pra alimentar
+ * a explicação Gemini com matéria-prima concreta — sem afetar o inputs_hash.
+ *
+ * Estes campos NÃO entram em computeDefcon nem no hash; alimentam só o texto
+ * pra ele poder dizer "alerta de chuva forte" em vez de "alto risco genérico"
+ * e "Celesc estável com 0.2% UCs" em vez de "setores estáveis".
+ */
+async function buildContextoExtra(
+  ctx: MutationCtx,
+  signals: AggregatedSignals,
+): Promise<{
+  alertas_top: Array<{ titulo: string; nivel_risco: string; cidades_count: number }>;
+  contexto_celesc: {
+    bairros_foco: typeof signals.celesc.bairros_foco;
+    municipios_secundarios: typeof signals.celesc.municipios_secundarios;
+  };
+}> {
+  const agora = Date.now();
+  const alertas = await ctx.db
+    .query("alertas_rss")
+    .withIndex("by_expiresAt", (q) => q.gte("expiresAt", agora))
+    .collect();
+
+  // Ordenar: Alto > Medio > Baixo, dentro do mesmo nível mais recente primeiro.
+  const prioridade: Record<string, number> = { "Alto": 0, "Medio": 1, "Baixo": 2 };
+  const top = [...alertas]
+    .sort((a, b) => {
+      const pa = prioridade[a.nivel_risco] ?? 3;
+      const pb = prioridade[b.nivel_risco] ?? 3;
+      if (pa !== pb) return pa - pb;
+      return b._creationTime - a._creationTime;
+    })
+    .slice(0, 2)
+    .map((a) => ({
+      titulo: a.titulo,
+      nivel_risco: a.nivel_risco,
+      cidades_count: a.cidades_afetadas_ibge.length,
+    }));
+
+  return {
+    alertas_top: top,
+    contexto_celesc: {
+      bairros_foco: signals.celesc.bairros_foco,
+      municipios_secundarios: signals.celesc.municipios_secundarios,
+    },
+  };
+}
+
+/**
  * Recalcula o estado DEFCON a partir das tabelas operacionais e persiste
  * o singleton `defcon_status`. Idempotente — se inputs_hash não mudou, no-op.
  *
  * Disparada reativamente pelo scheduler após upsertAlerta / ingestTelemetry /
- * completeSitrep. Pode também ser chamada manualmente via dashboard Convex.
+ * completeSitrep / reportCelescSnapshot.
  */
 export const recomputeDefcon = internalMutation({
   args: {},
@@ -184,24 +233,25 @@ export const recomputeDefcon = internalMutation({
         ultima_mudanca_em: agora,
       });
       console.log(`[DEFCON] init nivel=${result.nivel_global} hash=${inputs_hash}`);
-      // Agendar geração de explicação Gemini (assíncrona, não bloqueia)
+      const contexto = await buildContextoExtra(ctx, signals);
       await ctx.scheduler.runAfter(0, internal.defcon.actions.explainDefcon, {
         inputs_hash,
         nivel_global: result.nivel_global,
         niveis_categoria: result.niveis_categoria,
         sinais_disparadores: result.sinais_disparadores,
+        alertas_top: contexto.alertas_top,
+        contexto_celesc: contexto.contexto_celesc,
       });
       return;
     }
 
     // Caso 2: hash igual → nada mudou, no-op (curto-circuito barato).
     if (existing.inputs_hash === inputs_hash) {
-      // Atualizar só recomputado_em pra UI saber que checamos recentemente.
       await ctx.db.patch(existing._id, { recomputado_em: agora });
       return;
     }
 
-    // Caso 3: hash diferente → patch + (se nível mudou) agenda explicação.
+    // Caso 3: hash diferente → patch + agenda nova explicação.
     const nivelMudou = existing.nivel_global !== result.nivel_global;
     await ctx.db.patch(existing._id, {
       nivel_global: result.nivel_global,
@@ -223,13 +273,14 @@ export const recomputeDefcon = internalMutation({
       );
     }
 
-    // Sempre que hash mudou, vale gerar nova explicação (mesmo se nível não
-    // mudou, porque os sinais disparadores mudaram).
+    const contexto = await buildContextoExtra(ctx, signals);
     await ctx.scheduler.runAfter(0, internal.defcon.actions.explainDefcon, {
       inputs_hash,
       nivel_global: result.nivel_global,
       niveis_categoria: result.niveis_categoria,
       sinais_disparadores: result.sinais_disparadores,
+      alertas_top: contexto.alertas_top,
+      contexto_celesc: contexto.contexto_celesc,
     });
   },
 });
