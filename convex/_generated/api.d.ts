@@ -18,7 +18,7 @@ import type * as defcon_dev from "../defcon/dev.js";
 import type * as defcon_mutations from "../defcon/mutations.js";
 import type * as defcon_queries from "../defcon/queries.js";
 import type * as defcon_rules from "../defcon/rules.js";
-import type * as defcon_rules_catalog from "../defcon/rules-catalog.js";
+import type * as defcon_rules_catalog from "../defcon/rules_catalog.js";
 import type * as http from "../http.js";
 import type * as ingestor from "../ingestor.js";
 import type * as mock from "../mock.js";
@@ -42,7 +42,7 @@ declare const fullApi: ApiFromModules<{
   "defcon/mutations": typeof defcon_mutations;
   "defcon/queries": typeof defcon_queries;
   "defcon/rules": typeof defcon_rules;
-  "defcon/rules-catalog": typeof defcon_rules_catalog;
+  "defcon/rules_catalog": typeof defcon_rules_catalog;
   http: typeof http;
   ingestor: typeof ingestor;
   mock: typeof mock;

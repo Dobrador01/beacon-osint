@@ -8,7 +8,7 @@ import type { Doc } from "../_generated/dataModel";
 // ═══════════════════════════════════════════════════════════════════════════
 //
 // Padrão: ausência de row → usar DEFAULT_CONFIG. Primeira gravação na UI
-// cria o singleton. As regras em rules-catalog.ts consomem este objeto via
+// cria o singleton. As regras em rules_catalog.ts consomem este objeto via
 // parâmetro (passado pela recomputeDefcon).
 //
 // Mutation pública SEM AUTH — single-user assumption (dívida técnica

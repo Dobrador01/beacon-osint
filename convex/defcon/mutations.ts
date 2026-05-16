@@ -9,7 +9,7 @@ import {
   type Categoria,
   type DefconLevel,
 } from "./rules";
-import { RULES_CATALOG } from "./rules-catalog";
+import { RULES_CATALOG } from "./rules_catalog";
 import { readConfigOrDefaults, type DefconConfig } from "./config";
 
 // ═══════════════════════════════════════════════════════════════════════════

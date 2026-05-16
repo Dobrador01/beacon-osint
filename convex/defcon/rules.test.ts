@@ -22,7 +22,7 @@ import {
   type AggregatedSignals,
   type DefconLevel,
 } from "./rules";
-import { RULES_CATALOG } from "./rules-catalog";
+import { RULES_CATALOG } from "./rules_catalog";
 import { DEFAULT_CONFIG, type DefconConfig } from "./config";
 
 const IBGE_FLORIANOPOLIS = 4205407;
